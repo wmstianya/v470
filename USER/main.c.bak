@@ -1,0 +1,242 @@
+
+
+/*20180402，WIFI重启恢复出厂设置，对再次修改wifi名称和密码做了弥补*/
+
+/*2018年4月8日09:35:26   添加手动模式页面，长时间未切换，主动防呆功能，10分钟，无动作，切换到待机模式，并跳到主界面*/
+/*$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$*/
+/*2018年4月9日14:40:05    在冷凝热水的基础上修改蒸汽炉程序*/
+/*2018年4月10日09:29:37 添加流量控制设备的485通信解析，在Uart5.c*/
+    
+
+#include "main.h"
+#include "variable.h"
+
+
+
+
+
+ 
+
+int main(void)
+ { 
+//*****外部晶振12Mhz配置****************//	 
+	HSE_SetSysClk(RCC_PLLMul_6);
+//设置NVIC中断分组2:2位抢占优先级，2位响应优先级
+	NVIC_Configuration(); 	 
+//*********蜂鸣器端口，火焰检测端口配置****//
+  	LED_GPIO_Config();
+//*********继电器端口配置******************//
+	RELAYS_GPIO_Config();
+//*********wifi端口配置********************//  
+	WIFI_GPIO_Config();
+
+	 
+//*********并转串端口配置******************// 
+	PARALLEL_SERIAL_GPIO_Config();
+	     
+	 
+// ***************ADC 初始化****************//
+	ADCx_Init();  
+//***************串口1初始化为9600 for    RS485A1B1****//
+	uart_init(9600);
+//***************串口2初始化为4800       for WIFI*****//
+	uart2_init(4800);	
+//***************串口4初始化为115200       for LCD******//
+	uart4_init(115200);	 
+//***************串口5初始化为9600 for	RS485 A2B2****//
+
+	uart5_init(9600);
+//***配置1ms定时中断,包括全串口接收周期时间配置***//
+	TIM4_Int_Init(999,71); 
+//***************配置蜂鸣器 输出2.7Khz************//
+	TIM2_Int_Init(500,71);  
+//***************配置PWM定时器，2khz可调************//
+	TIM3_PWM_Init(); 
+	 
+	 
+//************** 配置RTC秒中断优先级 ************//
+	RTC_NVIC_Config();
+	RTC_CheckAndConfig(&systmtime);	 
+	 
+	
+//***************开机上电蜂鸣器滴一下************//
+	BEEP_TIME(300); 
+
+				
+//***************WiFi模组复位********************//
+	Wifi_Power_And_Reset();
+
+//***************继电器电源上电,已经硬件更改******************//	 
+	//POWER_12V_ON;
+	
+//**************对程序用到的结构体进行初始化处理*//
+
+	clear_struct_memory(); 
+	
+//**************系统参数默认配置，前吹扫，停炉温度等***//	
+	sys_control_config_function(); //
+	
+	SysTick_Delay_ms(5);
+
+	if((PortPin_Scan(SLAVE_ADDRESS_PORT,SLAVE_PIN_3)) == 1)
+		sys_flag.slave_address |= Set_Bit_1;
+	
+	if((PortPin_Scan(SLAVE_ADDRESS_PORT,SLAVE_PIN_4) )== 1)
+		sys_flag.slave_address |= Set_Bit_0;
+
+	printf("\r\n slave address = %d\r\n",sys_flag.slave_address);
+	
+	
+//**************LCD切换到第0页,执行开机和自检动画******//	
+	lcd_change_page(0x00);  
+
+//**************CPU ID 加密****************************// 
+
+	Write_CPU_ID_Encrypt();
+
+
+
+//**************将初始化配置的参数发给LCD**************//	
+	copy_to_lcd();	
+	
+	SysTick_Delay_ms(1000);
+	SysTick_Delay_ms(1000);
+	SysTick_Delay_ms(1000);
+	SysTick_Delay_ms(1000);
+	SysTick_Delay_ms(1000); //与DGUS屏同步，特增加延时
+	
+//**************wifi模块进入命令模式，开始字符**************//	
+	if(*(uint32 *)(CHECK_WIFI_ADDRESS) !=FLASH_WIFI_DATA)
+  		Usart_SendString( macUSART2,  "+++" );
+	
+	//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++调试用，待删除
+
+	//写内存，设标志，提示成功激活，再次进入，不再提示激活信息
+
+	
+		#if  NO_DEBUG
+		#else
+		Write_First_Flash();
+		#endif
+	//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+	if(*(uint32 *)(LOGIN_OK_ADDRESS) !=ACTIVATE_DATA)
+		{
+			send_lcd_1word(0x20,0x00,0xff,0x00);//将零隐藏起来
+			send_lcd_1word(0x20,0x10,0xff,0x00);//将零隐藏起来
+			send_lcd_1word(0x20,0x20,0xff,0x00);//将零隐藏起来
+			send_lcd_1word(0x20,0x30,0xff,0x00);//将零隐藏起来
+			lcd_change_page(0x68); //进入激活码输入界面
+		}
+			
+  	
+	//开启Passmack动画显示
+	send_lcd_1word(0x02,0x00,0x00,0x01);
+	SysTick_Delay_ms(1);
+  	send_lcd_1word(0x01,0x00,0x00,0x01);
+
+	//关闭WIFI动画显示
+    send_lcd_1word(0x01,0x06,0x00,0x00);
+	SysTick_Delay_ms(1);
+	send_lcd_1word(0x01,0x06,0x00,0x00);
+
+	//关闭水泵动画显示
+	send_lcd_1word(0x01,0x00,0x00,0x00);
+	SysTick_Delay_ms(1);
+	send_lcd_1word(0x01,0x00,0x00,0x00);
+
+	//**************针对LCD自带RTC和主板RTC时间同步********//	
+	send_str(cmd_get_time,6);
+	
+	//开启独立看门狗
+
+	// 单步调试时，需要关闭看门狗，用JLINK时，可以不关闭
+			
+	IWDG_Config(IWDG_Prescaler_64 ,900);//若超时没有喂狗则复位
+     
+	Flow_PercentToNumber(10);//将流量阀组关闭
+	
+	while(1)
+	{	
+
+	
+
+	////***********一般测试用***********//
+		send_product_information();
+
+//***********喂狗程序***********//
+	
+
+		IWDG_Feed();
+
+		Dgus_Manual_Page_out();
+//***********串口1 传感器485通信解析***********//		
+		
+		ModBus_Slave_Communication();
+		
+		ModBus_Communication();
+//***********串口5 传感器485通信解析***********//
+		Device_Flow_Control_Cmd();
+		Device_Data_Analyse();
+//***********系统内部读保护开启***********//
+		#if  NO_DEBUG
+		Flash_Read_Protect();
+		#endif	
+//***********系统累计运行时间统计***********//
+		sys_work_time_function();
+//***********系统自动维护程序***********//
+		System_Care_Fun();
+//***********LCD下发命令解析****************//
+		if(Judge_ID_Encrypt())
+			Lcd_Cmd_Analyse();
+//***********读取并转串口的数据*************//
+		read_serial_data();	
+//***********四路温度ADC处理函数************//
+		ADC_Process();
+
+
+//1s时间到，涉及wifi与服务器通信的时间，对LCD屏温度曲线刷新的速率//
+		One_Sec_Check();
+
+//*************锅炉主控程序******************//
+		
+
+		//如果没有激活，则进入激活页面，//待机平均111ms
+	if(sys_flag.Test_key_flag == 0x00)
+		{
+			if(*(uint32 *)(LOGIN_OK_ADDRESS) ==ACTIVATE_DATA)
+				{
+						if(Judge_ID_Encrypt())
+							 System_All_Control();
+				}	
+			//else		
+					//lcd_change_page(0x68); //进入激活码输入界面	
+		}
+	
+			if(sys_flag.Test_key_flag == 0x88)
+				{
+						if(Judge_ID_Encrypt())
+								System_All_Control();	
+				}
+				
+				
+		
+		
+
+//**********刷新LCD相关参数**************//
+		Mcu_Mail_Lcd();
+//**********wifi主控程序*****************//
+		wifi_main_function();
+ 
+  }
+}
+
+
+ 
+	
+	
+
+	
+	
+
+

@@ -1,0 +1,6 @@
+-c --cpu Cortex-M3 -g -O0 --apcs=interwork -I ..\HARDWARE\LED -I ..\SYSTEM\delay -I ..\SYSTEM\sys -I ..\SYSTEM\usart -I ..\USER -I ..\STM32F10x_FWLib\inc -I ..\CORE -I ..\HARDWARE\DHT11 -I ..\HARDWARE\timers -I ..\HARDWARE\24CXX -I ..\HARDWARE\FLASH -I ..\HARDWARE\RTC -I ..\HARDWARE\tm1638 -I ..\HARDWARE\ADC -I ..\HARDWARE\USART2 -I ..\HARDWARE\USART3 -I ..\HARDWARE\relays -I .\rcc -I .\systick -I ..\HARDWARE\USART4 -I ..\HARDWARE\USR_C210 -I ..\HARDWARE\Parallel_Serial -I ..\SYSTEM\system_control -I ..\SYSTEM\rtc -I ..\SYSTEM\in_flash -I ..\HARDWARE\PWM -I ..\SYSTEM\iwdg -I ..\SYSTEM\activate_key -I ..\HARDWARE\USART5 -I ..\SYSTEM\out_flash
+-ID:\临时文件\唐山蒸汽测试\UART\USER\RTE\_Target_1
+-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.0.0\CMSIS\Include
+-IC:\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\1.1.0\Device\Include
+-D__UVISION_VERSION="522" -D_RTE_ -DSTM32F10X_HD -DSTM32F10X_HD -DUSE_STDPERIPH_DRIVER
+-o ..\obj\stm32f10x_adc.o --omf_browse ..\obj\stm32f10x_adc.crf --depend ..\obj\stm32f10x_adc.d --feedback "..\OBJ\UART.fed" "..\STM32F10x_FWLib\src\stm32f10x_adc.c"
